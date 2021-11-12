@@ -1,9 +1,8 @@
-import numpy as np
-
 from BD_consts import NONE, PAD
+from typing import List
 
 
-def build_vocab(labels, BIO_tagging=True):
+def build_vocab(labels:List[str], BIO_tagging=True):
     all_labels = [PAD, NONE]
     for label in labels:
         if BIO_tagging:

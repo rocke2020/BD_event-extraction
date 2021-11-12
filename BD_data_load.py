@@ -3,12 +3,16 @@ from torch.utils import data
 import json
 from BD_consts import NONE, PAD, CLS, SEP, UNK, TRIGGERS, ARGUMENTS
 from BD_utils import build_vocab
-from pytorch_pretrained_bert import BertTokenizer
+from transformers import (
+    BertTokenizer,
+)
+
 
 # init vocab
 all_triggers, trigger2idx, idx2trigger = build_vocab(TRIGGERS)
 all_arguments, argument2idx, idx2argument = build_vocab(ARGUMENTS)
-tokenizer = BertTokenizer.from_pretrained('./bert-base-chinese-vocab.txt', do_lower_case=False, never_split=(PAD, CLS, SEP, UNK))
+model_path = '/data2/models_nlp/pyt/chinese-macbert-base-model'
+tokenizer = BertTokenizer.from_pretrained(model_path, do_lower_case=False, never_split=(PAD, CLS, SEP, UNK))
 
 
 class TrainDataset(data.Dataset):
