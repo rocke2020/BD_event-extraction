@@ -1,15 +1,20 @@
 import torch
 import torch.nn as nn
-from pytorch_pretrained_bert import BertModel
 from BD_data_load import idx2trigger, argument2idx, idx2argument
 from BD_consts import NONE
 from BD_utils import find_triggers
+from transformers import (
+    BertModel,
+)
+
+
+model_path = '/data2/models_nlp/pyt/chinese-macbert-base-model'
 
 
 class Net(nn.Module):
     def __init__(self, trigger_size=None, argument_size=None, device=torch.device("cpu")):
         super().__init__()
-        self.bert = BertModel.from_pretrained('./bert-base-chinese')
+        self.bert = BertModel.from_pretrained(model_path)
         hidden_size = 768
         self.rnn = nn.LSTM(bidirectional=True, num_layers=1, input_size=768, hidden_size=768 // 2, batch_first=True)
         self.linear_l = nn.Linear(hidden_size, hidden_size//2)

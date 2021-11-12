@@ -3,12 +3,13 @@ from torch.utils import data
 import json
 from BD_consts import NONE, PAD, CLS, SEP, UNK, TRIGGERS, ARGUMENTS
 from BD_utils import build_vocab
-from pytorch_pretrained_bert import BertTokenizer
+from transformers import BertTokenizer
 
 # init vocab
 all_triggers, trigger2idx, idx2trigger = build_vocab(TRIGGERS)
 all_arguments, argument2idx, idx2argument = build_vocab(ARGUMENTS)
-tokenizer = BertTokenizer.from_pretrained('./bert-base-chinese-vocab.txt', do_lower_case=False, never_split=(PAD, CLS, SEP, UNK))
+model_path = '/data2/models_nlp/pyt/chinese-macbert-base-model'
+tokenizer = BertTokenizer.from_pretrained(model_path, do_lower_case=False, never_split=(PAD, CLS, SEP, UNK))
 
 
 class TrainDataset(data.Dataset):
@@ -25,7 +26,7 @@ class TrainDataset(data.Dataset):
                 sentence = sentence.replace('\xa0', ',')
                 sentence = sentence.replace('\ue627', ',')
                 words = [word for word in sentence]
-                if len(words) > 500:
+                if len(words) > 510:
                     continue
                 triggers = [NONE] * len(words)
                 arguments = {
@@ -105,11 +106,12 @@ class TrainDataset(data.Dataset):
 
 
 def Trainpad(batch):
+    """ add pads """
     tokens_x_2d, id, triggers_y_2d, arguments_2d, seqlens_1d, head_indexes_2d, mask, words_2d, triggers_2d = list(map(list, zip(*batch)))
     maxlen = np.array(seqlens_1d).max()
 
     for i in range(len(tokens_x_2d)):
-        tokens_x_2d[i] = tokens_x_2d[i] + [0] * (maxlen - len(tokens_x_2d[i]))
+        tokens_x_2d[i] = tokens_x_2d[i] + [tokenizer.pad_token_id] * (maxlen - len(tokens_x_2d[i]))
         triggers_y_2d[i] = triggers_y_2d[i] + [trigger2idx[PAD]] * (maxlen - len(triggers_y_2d[i]))
         head_indexes_2d[i] = head_indexes_2d[i] + [0] * (maxlen - len(head_indexes_2d[i]))
         mask[i] = mask[i] + [0] * (maxlen - len(mask[i]))
@@ -135,7 +137,7 @@ class TestDataset(data.Dataset):
                 sentence = sentence.replace('\xa0', ',')
                 sentence = sentence.replace('\ue627', ',')
                 words = [word for word in sentence]
-                if len(words) > 500:
+                if len(words) > 510:
                     continue
 
                 self.sent_li.append([CLS] + words + [SEP])

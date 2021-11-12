@@ -99,11 +99,10 @@ if __name__ == "__main__":
         print("=========test at epoch={}=========".format(epoch))
         test(model, test_iter, fname + '_test')
         if stop >= early_stop:
-            print("The best result in epoch={}".format(epoch-early_stop-1))
+            print("The best result in epoch={}".format(epoch - early_stop - 1))
             break
         if trigger_f1 + argument_f1 > best_scores:
             best_scores = trigger_f1 + argument_f1
             stop = 0
             print("The new best in epoch={}".format(epoch))
             # torch.save(model, "best_model.pt")
-
