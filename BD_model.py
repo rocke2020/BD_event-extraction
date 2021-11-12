@@ -6,7 +6,9 @@ from BD_utils import find_triggers
 from transformers import (
     BertModel,
 )
+from utils import get_logger
 
+logger = get_logger(name=__name__, log_file=None)
 
 model_path = '/data2/models_nlp/pyt/chinese-macbert-base-model'
 
@@ -31,18 +33,16 @@ class Net(nn.Module):
         tokens_x_2d = torch.LongTensor(tokens_x_2d).to(self.device)
         mask = torch.LongTensor(mask).to(self.device)
         head_indexes_2d = torch.LongTensor(head_indexes_2d).to(self.device)
-
         if self.training:
             self.bert.train()
-            x, _ = self.bert(input_ids=tokens_x_2d, attention_mask=mask)
+            x, _ = self.bert(input_ids=tokens_x_2d, attention_mask=mask, return_dict=False)
         else:
             self.bert.eval()
             with torch.no_grad():
-                x, _ = self.bert(input_ids=tokens_x_2d, attention_mask=mask)
+                x, _ = self.bert(input_ids=tokens_x_2d, attention_mask=mask, return_dict=False)
         batch_size = tokens_x_2d.shape[0]
         for i in range(batch_size):
             x[i] = torch.index_select(x[i], 0, head_indexes_2d[i])
-
         trigger_logits = self.fc_trigger(x)
         trigger_hat_2d = trigger_logits.argmax(-1)
 

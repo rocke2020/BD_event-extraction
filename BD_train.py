@@ -8,6 +8,10 @@ from BD_model import Net
 from BD_data_load import TrainDataset, add_pad_for_train, TestDataset, Testpad, all_triggers, all_arguments
 from BD_eval import eval
 from BD_test import test
+from utils import get_logger
+from tqdm import tqdm
+
+logger = get_logger(name=__name__, log_file=None)
 
 
 def train(model, iterator, optimizer, criterion):
@@ -41,7 +45,7 @@ def train(model, iterator, optimizer, criterion):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", type=int, default=12)
+    parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--lr", type=float, default=0.00002)
     parser.add_argument("--n_epochs", type=int, default=100)
     parser.add_argument("--logdir", type=str, default="output")
@@ -51,7 +55,7 @@ if __name__ == "__main__":
 
     hp = parser.parse_args()
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
+    logger.info(f'device: {device}')
     model = Net(
         device=device,
         trigger_size=len(all_triggers),
@@ -89,7 +93,7 @@ if __name__ == "__main__":
     early_stop = 15
     stop = 0
     best_scores = 0.0
-    for epoch in range(1, hp.n_epochs + 1):
+    for epoch in tqdm(range(1, hp.n_epochs + 1)):
         stop += 1
         print("=========train at epoch={}=========".format(epoch))
         train(model, train_iter, optimizer, criterion)
