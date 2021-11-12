@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils import data
 from BD_model import Net
-from BD_data_load import TrainDataset, Trainpad, TestDataset, Testpad, all_triggers, all_arguments
+from BD_data_load import TrainDataset, add_pad_for_train, TestDataset, Testpad, all_triggers, all_arguments
 from BD_eval import eval
 from BD_test import test
 
@@ -15,9 +15,11 @@ def train(model, iterator, optimizer, criterion):
     for i, batch in enumerate(iterator):
         tokens_x_2d, id, triggers_y_2d, arguments_2d, seqlens_1d, head_indexes_2d, mask, words_2d, triggers_2d = batch
         optimizer.zero_grad()
-        trigger_logits, trigger_hat_2d, argument_logits, arguments_y_1d, argument_hat_2d = model.predict_triggers(tokens_x_2d=tokens_x_2d,
-                                                                                    mask=mask,head_indexes_2d=head_indexes_2d,
-                                                                                            arguments_2d=arguments_2d)
+        trigger_logits, trigger_hat_2d, argument_logits, arguments_y_1d, argument_hat_2d = model.predict_triggers(
+            tokens_x_2d=tokens_x_2d,
+            mask=mask,
+            head_indexes_2d=head_indexes_2d,
+            arguments_2d=arguments_2d)
         triggers_y_2d = torch.LongTensor(triggers_y_2d).to(model.device)
         triggers_y_2d = triggers_y_2d.view(-1)
         trigger_logits = trigger_logits.view(-1, trigger_logits.shape[-1])
@@ -66,12 +68,12 @@ if __name__ == "__main__":
                                  batch_size=hp.batch_size,
                                  shuffle=True,
                                  num_workers=4,
-                                 collate_fn=Trainpad)
+                                 collate_fn=add_pad_for_train)
     dev_iter = data.DataLoader(dataset=dev_dataset,
                                batch_size=hp.batch_size,
                                shuffle=False,
                                num_workers=4,
-                               collate_fn=Trainpad)
+                               collate_fn=add_pad_for_train)
     test_iter = data.DataLoader(dataset=test_dataset,
                                 batch_size=hp.batch_size,
                                 shuffle=False,

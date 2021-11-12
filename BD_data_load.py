@@ -105,20 +105,21 @@ class TrainDataset(data.Dataset):
         return np.array(samples_weight)
 
 
-def Trainpad(batch):
+def add_pad_for_train(batch):
     """ add pads """
-    tokens_x_2d, id, triggers_y_2d, arguments_2d, seqlens_1d, head_indexes_2d, mask, words_2d, triggers_2d = list(map(list, zip(*batch)))
+    tokens_x_2d, id, triggers_y_2d, arguments_2d, seqlens_1d, head_indexes_2d, mask_2d, words_2d, triggers_2d = zip(
+        *batch)
     maxlen = np.array(seqlens_1d).max()
 
     for i in range(len(tokens_x_2d)):
         tokens_x_2d[i] = tokens_x_2d[i] + [tokenizer.pad_token_id] * (maxlen - len(tokens_x_2d[i]))
         triggers_y_2d[i] = triggers_y_2d[i] + [trigger2idx[PAD]] * (maxlen - len(triggers_y_2d[i]))
         head_indexes_2d[i] = head_indexes_2d[i] + [0] * (maxlen - len(head_indexes_2d[i]))
-        mask[i] = mask[i] + [0] * (maxlen - len(mask[i]))
+        mask_2d[i] = mask_2d[i] + [0] * (maxlen - len(mask_2d[i]))
 
     return tokens_x_2d, id, \
            triggers_y_2d, arguments_2d, \
-           seqlens_1d, head_indexes_2d, mask, \
+           seqlens_1d, head_indexes_2d, mask_2d, \
            words_2d, triggers_2d
 
 
