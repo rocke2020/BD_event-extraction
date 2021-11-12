@@ -34,14 +34,11 @@ class Net(nn.Module):
 
         if self.training:
             self.bert.train()
-            encoded_layers, _ = self.bert(input_ids=tokens_x_2d, attention_mask=mask)
-            enc = encoded_layers[-1]
+            x, _ = self.bert(input_ids=tokens_x_2d, attention_mask=mask)
         else:
             self.bert.eval()
             with torch.no_grad():
-                encoded_layers, _ = self.bert(input_ids=tokens_x_2d, attention_mask=mask)
-                enc = encoded_layers[-1]
-        x = enc
+                x, _ = self.bert(input_ids=tokens_x_2d, attention_mask=mask)
         batch_size = tokens_x_2d.shape[0]
         for i in range(batch_size):
             x[i] = torch.index_select(x[i], 0, head_indexes_2d[i])
