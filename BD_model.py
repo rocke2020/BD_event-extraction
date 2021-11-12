@@ -6,7 +6,9 @@ from BD_utils import find_triggers
 from transformers import (
     BertModel,
 )
+from utils import get_logger
 
+logger = get_logger(name=__name__, log_file=None)
 
 model_path = '/data2/models_nlp/pyt/chinese-macbert-base-model'
 
@@ -27,26 +29,25 @@ class Net(nn.Module):
         )
         self.device = device
 
-    def predict_triggers(self, tokens_x_2d, mask, head_indexes_2d, arguments_2d=None, Test=False):
-        tokens_x_2d = torch.LongTensor(tokens_x_2d).to(self.device)
+    def predict_triggers(self, tokens_x, mask, head_indexes, arguments_true=None, Test=False):
+        tokens_x = torch.LongTensor(tokens_x).to(self.device)
         mask = torch.LongTensor(mask).to(self.device)
-        head_indexes_2d = torch.LongTensor(head_indexes_2d).to(self.device)
-
+        head_indexes = torch.LongTensor(head_indexes).to(self.device)
         if self.training:
             self.bert.train()
-            x, _ = self.bert(input_ids=tokens_x_2d, attention_mask=mask)
+            x, _ = self.bert(input_ids=tokens_x, attention_mask=mask, return_dict=False)
         else:
             self.bert.eval()
             with torch.no_grad():
-                x, _ = self.bert(input_ids=tokens_x_2d, attention_mask=mask)
-        batch_size = tokens_x_2d.shape[0]
+                x, _ = self.bert(input_ids=tokens_x, attention_mask=mask, return_dict=False)
+        batch_size = tokens_x.shape[0]
+        # X shape: (bs, L, H)
         for i in range(batch_size):
-            x[i] = torch.index_select(x[i], 0, head_indexes_2d[i])
-
+            x[i] = torch.index_select(x[i], 0, head_indexes[i])
         trigger_logits = self.fc_trigger(x)
         trigger_hat_2d = trigger_logits.argmax(-1)
 
-        x_rnn, h0, argument_candidate = [], [], []
+        x_rnn, h0, predicted_triggers_with_seq_num = [], [], []
         for i in range(batch_size):
             predicted_triggers = find_triggers([idx2trigger[trigger] for trigger in trigger_hat_2d[i].tolist()])
             for predicted_trigger in predicted_triggers:
@@ -56,22 +57,22 @@ class Net(nn.Module):
                 event_tensor = torch.stack([event_tensor_l, event_tensor_r])
                 h0.append(event_tensor)
                 x_rnn.append(x[i])
-                argument_candidate.append((i, t_start, t_end, t_type_str))
+                predicted_triggers_with_seq_num.append((i, t_start, t_end, t_type_str))
 
         argument_logits, arguments_y_1d = [0], [0]
         argument_hat_2d = [{'events': {}} for _ in range(batch_size)]
-        if len(argument_candidate) > 0:
+        if len(predicted_triggers_with_seq_num) > 0:
             h0 = torch.stack(h0, dim=1)
-            c0 = torch.zeros(h0.shape[:], dtype=torch.float)
+            c0 = torch.zeros(h0.shape, dtype=torch.float)
             c0 = c0.to(self.device)
             x_rnn = torch.stack(x_rnn)
             rnn_out, (hn, cn) = self.rnn(x_rnn, (h0,c0))
             argument_logits = self.fc_argument(rnn_out)
+            # shape: (N_trigger L H), N is the number of predicted triggers
             argument_hat = argument_logits.argmax(-1)
 
-            argument_hat_2d = [{'events': {}} for _ in range(batch_size)]
             for i in range(len(argument_hat)):
-                ba, st, ed, event_type_str = argument_candidate[i]
+                ba, st, ed, event_type_str = predicted_triggers_with_seq_num[i]
                 if (st, ed, event_type_str) not in argument_hat_2d[ba]['events']:
                     argument_hat_2d[ba]['events'][(st, ed, event_type_str)] = []
                 predicted_arguments = find_triggers([idx2argument[argument] for argument in argument_hat[i].tolist()])
@@ -81,10 +82,11 @@ class Net(nn.Module):
 
             arguments_y_1d = []
             if Test == False:
-                for i, t_start, t_end, t_type_str in argument_candidate:
+                # shape: (N_trigger L H), N is the number of predicted triggers
+                for seq_num, t_start, t_end, t_type_str in predicted_triggers_with_seq_num:
                     a_label = [NONE] * x.shape[1]
-                    if (t_start, t_end, t_type_str) in arguments_2d[i]['events']:
-                        for (a_start, a_end, a_role) in arguments_2d[i]['events'][(t_start, t_end, t_type_str)]:
+                    if (t_start, t_end, t_type_str) in arguments_true[seq_num]['events']:
+                        for (a_start, a_end, a_role) in arguments_true[i]['events'][(t_start, t_end, t_type_str)]:
                             for j in range(a_start, a_end):
                                 if j == a_start:
                                     a_label[j] = 'B-{}'.format(a_role)
