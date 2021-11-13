@@ -32,18 +32,17 @@ class Net(nn.Module):
     def predict_triggers(self, tokens_x, mask, head_indexes, arguments_true=None, Test=False):
         tokens_x = torch.LongTensor(tokens_x).to(self.device)
         mask = torch.LongTensor(mask).to(self.device)
-        head_indexes = torch.LongTensor(head_indexes).to(self.device)
+        head_indexes_2d = torch.LongTensor(head_indexes_2d).to(self.device)
         if self.training:
             self.bert.train()
-            x, _ = self.bert(input_ids=tokens_x, attention_mask=mask, return_dict=False)
+            x, _ = self.bert(input_ids=tokens_x_2d, attention_mask=mask, return_dict=False)
         else:
             self.bert.eval()
             with torch.no_grad():
-                x, _ = self.bert(input_ids=tokens_x, attention_mask=mask, return_dict=False)
-        batch_size = tokens_x.shape[0]
-        # X shape: (bs, L, H)
+                x, _ = self.bert(input_ids=tokens_x_2d, attention_mask=mask, return_dict=False)
+        batch_size = tokens_x_2d.shape[0]
         for i in range(batch_size):
-            x[i] = torch.index_select(x[i], 0, head_indexes[i])
+            x[i] = torch.index_select(x[i], 0, head_indexes_2d[i])
         trigger_logits = self.fc_trigger(x)
         triggers_predicted = trigger_logits.argmax(-1)
 

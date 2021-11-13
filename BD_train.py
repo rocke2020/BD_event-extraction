@@ -45,7 +45,7 @@ def train(model, iterator, optimizer, criterion):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", type=int, default=4)
+    parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--lr", type=float, default=0.00002)
     parser.add_argument("--n_epochs", type=int, default=100)
     parser.add_argument("--logdir", type=str, default="output")
