@@ -17,7 +17,7 @@ tokenizer = BertTokenizer.from_pretrained(model_path, do_lower_case=False, never
 
 class TrainDataset(data.Dataset):
     def __init__(self, fpath):
-        self.sent_li, self.id_li, self.triggers_li, self.arguments_li = [], [], [], []
+        self.sentences, self.ids, self.triggers, self.arguments = [], [], [], []
 
         with open(fpath, 'r', encoding='utf-8') as f:
             for line in f.readlines():
@@ -29,7 +29,8 @@ class TrainDataset(data.Dataset):
                 sentence = sentence.replace('\xa0', ',')
                 sentence = sentence.replace('\ue627', ',')
                 words = [word for word in sentence]
-                if len(words) > 510:
+                # Only works for Chinese where the subword is rare, Normally, We should firstly tokenize and the calculate length
+                if len(words) > 500:
                     continue
                 triggers = [NONE] * len(words)
                 arguments = {
@@ -58,16 +59,16 @@ class TrainDataset(data.Dataset):
                         a_id_e = a_id_s + len(argument_text)
                         arguments['events'][event_key].append((a_id_s, a_id_e, role))
 
-                self.sent_li.append([CLS] + words + [SEP])
-                self.id_li.append(id)
-                self.triggers_li.append(triggers)
-                self.arguments_li.append(arguments)
+                self.sentences.append([CLS] + words + [SEP])
+                self.ids.append(id)
+                self.triggers.append(triggers)
+                self.arguments.append(arguments)
 
     def __len__(self):
-        return len(self.sent_li)
+        return len(self.sentences)
 
     def __getitem__(self, idx):
-        words, id, triggers, arguments = self.sent_li[idx], self.id_li[idx], self.triggers_li[idx], self.arguments_li[idx]
+        words, id, triggers, arguments_true = self.sentences[idx], self.ids[idx], self.triggers[idx], self.arguments[idx]
 
         tokens_x, is_heads = [], []
         for w in words:
@@ -83,19 +84,19 @@ class TrainDataset(data.Dataset):
 
             tokens_x.extend(tokens_xx), is_heads.extend(is_head)
 
-        triggers_y = [trigger2idx[t] for t in triggers]
+        trigger_logits_true = [trigger2idx[t] for t in triggers]
         head_indexes = []
         for i in range(len(is_heads)):
             if is_heads[i]:
                 head_indexes.append(i)
-        seqlen = len(tokens_x)
-        mask = [1] * seqlen
+        seq_len = len(tokens_x)
+        mask = [1] * seq_len
 
-        return tokens_x, id, triggers_y, arguments, seqlen, head_indexes, mask, words, triggers
+        return tokens_x, id, trigger_logits_true, arguments_true, seq_len, head_indexes, mask, words, triggers
 
     def get_samples_weight(self):
         samples_weight = []
-        for triggers in self.triggers_li:
+        for triggers in self.triggers:
             not_none = False
             for trigger in triggers:
                 if trigger != NONE:
@@ -110,20 +111,19 @@ class TrainDataset(data.Dataset):
 
 def add_pad_for_train(batch):
     """ add pads """
-    (tokens_x_2d, id, triggers_y_2d, arguments_2d, seqlens_1d, head_indexes_2d, mask_2d, words_2d, triggers_2d
+    (tokens_x, id, trigger_logits_true, arguments_true, seq_lens, head_indexes, mask, words, triggers
         ) = map(list, zip(*batch))
-    maxlen = np.array(seqlens_1d).max()
-    for i in range(len(tokens_x_2d)):
-        tokens_x_2d[i] = tokens_x_2d[i] + [tokenizer.pad_token_id] * (maxlen - len(tokens_x_2d[i]))
-        triggers_y_2d[i] = triggers_y_2d[i] + [trigger2idx[PAD]] * (maxlen - len(triggers_y_2d[i]))
-        head_indexes_2d[i] = head_indexes_2d[i] + [0] * (maxlen - len(head_indexes_2d[i]))
-        mask_2d[i] = mask_2d[i] + [0] * (maxlen - len(mask_2d[i]))
+    maxlen = np.array(seq_lens).max()
+    for i in range(len(tokens_x)):
+        tokens_x[i] = tokens_x[i] + [tokenizer.pad_token_id] * (maxlen - len(tokens_x[i]))
+        trigger_logits_true[i] = trigger_logits_true[i] + [trigger2idx[PAD]] * (maxlen - len(trigger_logits_true[i]))
+        head_indexes[i] = head_indexes[i] + [0] * (maxlen - len(head_indexes[i]))
+        mask[i] = mask[i] + [0] * (maxlen - len(mask[i]))
 
-    return tokens_x_2d, id, \
-           triggers_y_2d, arguments_2d, \
-           seqlens_1d, head_indexes_2d, mask_2d, \
-           words_2d, triggers_2d
-
+    return tokens_x, id, \
+           trigger_logits_true, arguments_true, \
+           seq_lens, head_indexes, mask, \
+           words, triggers
 
 
 class TestDataset(data.Dataset):
@@ -140,7 +140,7 @@ class TestDataset(data.Dataset):
                 sentence = sentence.replace('\xa0', ',')
                 sentence = sentence.replace('\ue627', ',')
                 words = [word for word in sentence]
-                if len(words) > 510:
+                if len(words) > 500:
                     continue
 
                 self.sent_li.append([CLS] + words + [SEP])

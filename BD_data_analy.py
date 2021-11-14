@@ -5,20 +5,31 @@ path_train = './data/train.json'
 path_dev = './data/dev.json'
 path_list = [path_train, path_dev]
 
+long_texts = []
 events = []
+total_number = 0
 for path in path_list:
     with open(path, mode='r', encoding='utf-8') as f:
-        for line in f.readlines():
+        lines = f.readlines()
+        total_number += len(lines)
+        for line in lines:
             data = json.loads(line)
             sentence = data['text']
             words = [word for word in sentence]
             if len(words) > 500:
                 print("===")
+                long_texts.append(sentence)
 
             for event_mention in data['event_list']:
                 if event_mention['event_type'] not in events:
                     events.append(event_mention['event_type'])
-            
+
+with open('data/long_sentences.txt', 'w', encoding='utf-8') as f:
+    f.write(f'number of long sentence: {len(long_texts)}\n')
+    f.write(f'total number of sentence: {total_number}\n')
+    for item in long_texts:
+        f.write(f'{item}\n')
+    
 triggers = {}
 for trigger in events:
     triggers[trigger.split('-')[-1]] = trigger
@@ -151,4 +162,3 @@ f.close()
 #
 # # with open('./data/num.json', 'w') as f:
 # #     json.dump(b, f, indent=2, ensure_ascii=False)
-

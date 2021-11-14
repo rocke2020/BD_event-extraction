@@ -1,0 +1,2 @@
+number of long sentence: 0
+total number of sentence: 13456
