@@ -19,11 +19,11 @@ def train(model, iterator, optimizer, criterion):
     for i, batch in enumerate(iterator):
         tokens_x_2d, id, triggers_y_2d, arguments_2d, seqlens_1d, head_indexes_2d, mask, words_2d, triggers_2d = batch
         optimizer.zero_grad()
-        trigger_logits, trigger_hat_2d, argument_logits, arguments_y_1d, argument_hat_2d = model.predict_triggers(
+        trigger_logits, triggers, argument_logits, arguments_true_match_predicted, arguments_predicted = model.predict_triggers(
             tokens_x_2d=tokens_x_2d,
             mask=mask,
             head_indexes_2d=head_indexes_2d,
-            arguments_2d=arguments_2d)
+            arguments_true=arguments_2d)
         triggers_y_2d = torch.LongTensor(triggers_y_2d).to(model.device)
         triggers_y_2d = triggers_y_2d.view(-1)
         trigger_logits = trigger_logits.view(-1, trigger_logits.shape[-1])
@@ -31,7 +31,7 @@ def train(model, iterator, optimizer, criterion):
 
         if len(argument_logits) != 1:
             argument_logits = argument_logits.view(-1, argument_logits.shape[-1])
-            argument_loss = criterion(argument_logits, arguments_y_1d.view(-1))
+            argument_loss = criterion(argument_logits, arguments_true_match_predicted.view(-1))
             loss = trigger_loss + 2 * argument_loss
         else:
             loss = trigger_loss

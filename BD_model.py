@@ -45,11 +45,12 @@ class Net(nn.Module):
         for i in range(batch_size):
             x[i] = torch.index_select(x[i], 0, head_indexes[i])
         trigger_logits = self.fc_trigger(x)
-        trigger_hat_2d = trigger_logits.argmax(-1)
+        # shape 2d
+        triggers = trigger_logits.argmax(-1)
 
         x_rnn, h0, predicted_triggers_with_seq_num = [], [], []
         for i in range(batch_size):
-            predicted_triggers = find_triggers([idx2trigger[trigger] for trigger in trigger_hat_2d[i].tolist()])
+            predicted_triggers = find_triggers([idx2trigger[trigger] for trigger in triggers[i].tolist()])
             for predicted_trigger in predicted_triggers:
                 t_start, t_end, t_type_str = predicted_trigger
                 event_tensor_l = self.linear_l(x[i, t_start, :])
@@ -59,8 +60,9 @@ class Net(nn.Module):
                 x_rnn.append(x[i])
                 predicted_triggers_with_seq_num.append((i, t_start, t_end, t_type_str))
 
-        argument_logits, arguments_y_1d = [0], [0]
-        argument_hat_2d = [{'events': {}} for _ in range(batch_size)]
+        argument_logits, arguments_true_match_predicted = [0], [0]
+        # shape 2d
+        arguments_predicted = [{'events': {}} for _ in range(batch_size)]
         if len(predicted_triggers_with_seq_num) > 0:
             h0 = torch.stack(h0, dim=1)
             c0 = torch.zeros(h0.shape, dtype=torch.float)
@@ -73,14 +75,14 @@ class Net(nn.Module):
 
             for i in range(len(argument_hat)):
                 ba, st, ed, event_type_str = predicted_triggers_with_seq_num[i]
-                if (st, ed, event_type_str) not in argument_hat_2d[ba]['events']:
-                    argument_hat_2d[ba]['events'][(st, ed, event_type_str)] = []
+                if (st, ed, event_type_str) not in arguments_predicted[ba]['events']:
+                    arguments_predicted[ba]['events'][(st, ed, event_type_str)] = []
                 predicted_arguments = find_triggers([idx2argument[argument] for argument in argument_hat[i].tolist()])
                 for predicted_argument in predicted_arguments:
                     e_start, e_end, e_type_str = predicted_argument
-                    argument_hat_2d[ba]['events'][(st, ed, event_type_str)].append((e_start, e_end, e_type_str))
-
-            arguments_y_1d = []
+                    arguments_predicted[ba]['events'][(st, ed, event_type_str)].append((e_start, e_end, e_type_str))
+            # shape 1d
+            arguments_true_match_predicted = []
             if Test == False:
                 # shape: (N_trigger L H), N is the number of predicted triggers
                 for seq_num, t_start, t_end, t_type_str in predicted_triggers_with_seq_num:
@@ -92,19 +94,10 @@ class Net(nn.Module):
                                     a_label[j] = 'B-{}'.format(a_role)
                                 else:
                                     a_label[j] = 'I-{}'.format(a_role)
-                        # for e_start, e_end, e_role in argument_hat_2d[i]['events'][(t_start, t_end, t_type_str)]:
-                        #     for (a_start, a_end, a_role) in arguments_2d[i]['events'][(t_start, t_end, t_type_str)]:
-                        #         if e_start == a_start and e_end == a_end:
-                        #             for j in range(e_start, e_end):
-                        #                 if j == e_start:
-                        #                     a_label[j] = 'B-{}'.format(a_role)
-                        #                 else:
-                        #                     a_label[j] = 'I-{}'.format(a_role)
-                        #             break
                     a_label = [argument2idx[t] for t in a_label]
-                    arguments_y_1d.append(a_label)
+                    arguments_true_match_predicted.append(a_label)
 
-            arguments_y_1d = torch.LongTensor(arguments_y_1d).to(self.device)
+            arguments_true_match_predicted = torch.LongTensor(arguments_true_match_predicted).to(self.device)
 
 
-        return trigger_logits, trigger_hat_2d, argument_logits, arguments_y_1d, argument_hat_2d
+        return trigger_logits, triggers, argument_logits, arguments_true_match_predicted, arguments_predicted
