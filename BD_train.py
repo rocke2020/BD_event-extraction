@@ -17,17 +17,18 @@ logger = get_logger(name=__name__, log_file=None)
 def train(model, iterator, optimizer, criterion):
     model.train()
     for i, batch in enumerate(iterator):
-        tokens_x_2d, id, triggers_y_2d, arguments_2d, seqlens_1d, head_indexes_2d, mask, words_2d, triggers_2d = batch
+        tokens_x, id, trigger_logits_true, arguments, seq_len, head_indexes, mask, words, triggers = batch
         optimizer.zero_grad()
-        trigger_logits, triggers, argument_logits, arguments_true_match_predicted, arguments_predicted = model.predict_triggers(
-            tokens_x_2d=tokens_x_2d,
-            mask=mask,
-            head_indexes_2d=head_indexes_2d,
-            arguments_true=arguments_2d)
-        triggers_y_2d = torch.LongTensor(triggers_y_2d).to(model.device)
-        triggers_y_2d = triggers_y_2d.view(-1)
+        trigger_logits, triggers_predicted, argument_logits, arguments_true_match_predicted, arguments_predicted = (
+            model.predict_triggers(
+                tokens_x=tokens_x,
+                mask=mask,
+                head_indexes=head_indexes,
+                arguments=arguments))
+        trigger_logits_true = torch.LongTensor(trigger_logits_true).to(model.device)
+        trigger_logits_true = trigger_logits_true.view(-1)
         trigger_logits = trigger_logits.view(-1, trigger_logits.shape[-1])
-        trigger_loss = criterion(trigger_logits, triggers_y_2d)
+        trigger_loss = criterion(trigger_logits, trigger_logits_true)
 
         if len(argument_logits) != 1:
             argument_logits = argument_logits.view(-1, argument_logits.shape[-1])
@@ -45,7 +46,7 @@ def train(model, iterator, optimizer, criterion):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", type=int, default=4)
+    parser.add_argument("--batch_size", type=int, default=6)
     parser.add_argument("--lr", type=float, default=0.00002)
     parser.add_argument("--n_epochs", type=int, default=100)
     parser.add_argument("--logdir", type=str, default="output")
@@ -102,8 +103,8 @@ if __name__ == "__main__":
         print("=========dev at epoch={}=========".format(epoch))
         trigger_f1, argument_f1 = eval(model, dev_iter, fname + '_dev')
 
-        print("=========test at epoch={}=========".format(epoch))
-        test(model, test_iter, fname + '_test')
+        # print("=========test at epoch={}=========".format(epoch))
+        # test(model, test_iter, fname + '_test')
         if stop >= early_stop:
             print("The best result in epoch={}".format(epoch - early_stop - 1))
             break
@@ -111,4 +112,4 @@ if __name__ == "__main__":
             best_scores = trigger_f1 + argument_f1
             stop = 0
             print("The new best in epoch={}".format(epoch))
-            # torch.save(model, "best_model.pt")
+            # torch.save(model, "best_model.pt")0
